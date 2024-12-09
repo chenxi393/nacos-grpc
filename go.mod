@@ -1,4 +1,4 @@
-module resolver
+module github.com/chenxi393/nacos-grpc
 
 go 1.22
 
