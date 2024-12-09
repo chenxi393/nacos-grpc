@@ -94,7 +94,7 @@ func (m *endpointManager) watch(ctx context.Context, upch chan []*Update) {
 			for _, kv := range services {
 				up := &Update{
 					Key:      string(kv.ServiceName),
-					Endpoint: Endpoint{Addr: kv.Ip, Metadata: kv.Metadata},
+					Endpoint: Endpoint{Addr: kv.Ip + ":" + strconv.FormatUint(kv.Port, 10), Metadata: kv.Metadata},
 				}
 				upch <- []*Update{up}
 			}
