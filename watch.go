@@ -3,7 +3,7 @@ package resolver
 import (
 	"context"
 	"errors"
-	"net/url"
+	"strconv"
 
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
@@ -30,10 +30,10 @@ type endpointManager struct {
 	// Client is an initialized nacos naming client.
 	client naming_client.INamingClient
 	target string
-	url    *url.URL
+	group  string
 }
 
-func NewManager(client naming_client.INamingClient, target string) (*endpointManager, error) {
+func NewManager(client naming_client.INamingClient, target string, group string) (*endpointManager, error) {
 	if client == nil {
 		return nil, errors.New("invalid client")
 	}
@@ -45,24 +45,15 @@ func NewManager(client naming_client.INamingClient, target string) (*endpointMan
 	em := &endpointManager{
 		client: client,
 		target: target,
+		group:  group,
 	}
 	return em, nil
 }
 
 func (m *endpointManager) NewWatchChannel(ctx context.Context) (WatchChannel, error) {
-	// 解析targe 获取参数 获取groupName clusters
-	parsedURL, err := url.Parse(m.target)
-	if err != nil {
-		return nil, err
-	}
-	m.url = parsedURL
-	// 提取查询参数
-	queryParams := parsedURL.Query()
-
 	instances, err := m.client.SelectInstances(vo.SelectInstancesParam{
-		ServiceName: parsedURL.Host,
-		GroupName:   queryParams.Get("group_name"),
-		Clusters:    []string{queryParams.Get("clusters")},
+		ServiceName: m.target,
+		GroupName:   m.group,
 		HealthyOnly: true,
 	})
 	if err != nil {
@@ -76,7 +67,7 @@ func (m *endpointManager) NewWatchChannel(ctx context.Context) (WatchChannel, er
 	for _, kv := range instances {
 		up := &Update{
 			Key:      string(kv.ServiceName),
-			Endpoint: Endpoint{Addr: kv.Ip, Metadata: kv.Metadata},
+			Endpoint: Endpoint{Addr: kv.Ip + ":" + strconv.FormatUint(kv.Port, 10), Metadata: kv.Metadata},
 		}
 		initUpdates = append(initUpdates, up)
 	}
@@ -94,9 +85,8 @@ func (m *endpointManager) watch(ctx context.Context, upch chan []*Update) {
 	defer close(upch)
 	// 订阅变更
 	err := m.client.Subscribe(&vo.SubscribeParam{
-		ServiceName: m.url.Host,
-		GroupName:   m.url.Query().Get("group_name"),
-		Clusters:    []string{m.url.Query().Get("clusters")},
+		ServiceName: m.target,
+		GroupName:   m.group,
 		SubscribeCallback: func(services []model.Instance, err error) {
 			if err != nil {
 				panic(err)

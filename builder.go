@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"strings"
 
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
 	"google.golang.org/grpc/codes"
@@ -19,6 +20,7 @@ func (b builder) Build(target gresolver.Target, cc gresolver.ClientConn, opts gr
 	if endpoint == "" {
 		endpoint = target.URL.Opaque
 	}
+	endpoint = strings.Trim(endpoint, "/")
 	r := &resolver{
 		c:      b.c,
 		target: endpoint,
@@ -26,7 +28,7 @@ func (b builder) Build(target gresolver.Target, cc gresolver.ClientConn, opts gr
 	}
 	r.ctx, r.cancel = context.WithCancel(context.Background())
 
-	em, err := NewManager(r.c, r.target)
+	em, err := NewManager(r.c, r.target, b.group)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "resolver: failed to new endpoint manager: %s", err)
 	}
